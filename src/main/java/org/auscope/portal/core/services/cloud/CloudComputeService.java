@@ -24,7 +24,11 @@ import org.jclouds.compute.domain.Volume;
 import org.jclouds.compute.options.TemplateOptions;
 import org.jclouds.ec2.compute.options.EC2TemplateOptions;
 import org.jclouds.ec2.reference.EC2Constants;
+import org.jclouds.logging.slf4j.config.SLF4JLoggingModule;
 import org.jclouds.openstack.nova.v2_0.compute.options.NovaTemplateOptions;
+
+import com.google.common.collect.ImmutableSet;
+import com.google.inject.Module;
 
 /**
  * Service class wrapper for interacting with a remote cloud compute service using
@@ -92,10 +96,13 @@ public class CloudComputeService {
         }
         this.provider = provider;
         
+        Iterable<Module> modules = ImmutableSet.<Module> of(new SLF4JLoggingModule());
+
         ContextBuilder b = ContextBuilder.newBuilder(typeString)
                 .endpoint(endpoint)
                 .overrides(overrides)
-                .credentials(accessKey, secretKey);
+                .credentials(accessKey, secretKey)
+            .modules(modules);
         
         if (apiVersion != null) {
             b.apiVersion(apiVersion);
