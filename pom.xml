@@ -505,6 +505,12 @@
             <artifactId>jclouds-all</artifactId>
             <version>1.7.1</version>
         </dependency>
+        <!-- Extra logging for jclouds -->
+        <dependency>
+            <groupId>org.apache.jclouds.driver</groupId>
+            <artifactId>jclouds-slf4j</artifactId>
+            <version>1.7.1</version>
+        </dependency>
         <dependency>
 		    <groupId>commons-io</groupId>
 		    <artifactId>commons-io</artifactId>
