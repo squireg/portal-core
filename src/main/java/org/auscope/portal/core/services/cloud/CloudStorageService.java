@@ -24,7 +24,11 @@ import org.jclouds.blobstore.domain.internal.BlobMetadataImpl;
 import org.jclouds.blobstore.domain.internal.MutableBlobMetadataImpl;
 import org.jclouds.blobstore.options.ListContainerOptions;
 import org.jclouds.io.ContentMetadata;
+import org.jclouds.logging.slf4j.config.SLF4JLoggingModule;
 import org.jclouds.rest.AuthorizationException;
+
+import com.google.common.collect.ImmutableSet;
+import com.google.inject.Module;
 
 /**
  * Service for providing storage of objects (blobs) in a cloud using the JClouds library
@@ -147,11 +151,14 @@ public class CloudStorageService {
         if (regionName != null) {
             properties.setProperty("jclouds.region", regionName);
         }
+
+        Iterable<Module> modules = ImmutableSet.<Module> of(new SLF4JLoggingModule());
         
         this.blobStoreContext = ContextBuilder.newBuilder(provider)
                 .overrides(properties)
                 .endpoint(endpoint)
                 .credentials(accessKey, secretKey)
+                .modules(modules)
                 .build(BlobStoreContext.class);
     }
     
