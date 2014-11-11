@@ -2,6 +2,7 @@ package org.auscope.portal.core.services.cloud;
 
 import java.nio.charset.Charset;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
@@ -22,9 +23,17 @@ import org.jclouds.compute.domain.Processor;
 import org.jclouds.compute.domain.Template;
 import org.jclouds.compute.domain.Volume;
 import org.jclouds.compute.options.TemplateOptions;
+import org.jclouds.domain.Location;
 import org.jclouds.ec2.compute.options.EC2TemplateOptions;
 import org.jclouds.ec2.reference.EC2Constants;
+import org.jclouds.openstack.nova.v2_0.NovaApi;
 import org.jclouds.openstack.nova.v2_0.compute.options.NovaTemplateOptions;
+import org.jclouds.openstack.nova.v2_0.domain.Server;
+import org.jclouds.openstack.nova.v2_0.domain.ServerCreated;
+import org.jclouds.openstack.nova.v2_0.domain.zonescoped.AvailabilityZone;
+import org.jclouds.openstack.nova.v2_0.extensions.AvailabilityZoneAPI;
+import org.jclouds.openstack.nova.v2_0.features.ServerApi;
+import org.jclouds.openstack.nova.v2_0.options.CreateServerOptions;
 
 /**
  * Service class wrapper for interacting with a remote cloud compute service using
@@ -44,6 +53,7 @@ public class CloudComputeService {
     private final Log logger = LogFactory.getLog(getClass());
 
     private ComputeService computeService;
+    private NovaApi api;
 
     /** Unique ID for distinguishing instances of this class - can be null*/
     private String id;
@@ -100,10 +110,14 @@ public class CloudComputeService {
         if (apiVersion != null) {
             b.apiVersion(apiVersion);
         }
+        
+        api = b.buildApi(NovaApi.class);
 
         ComputeServiceContext context = b.buildView(ComputeServiceContext.class);
+        
+        
         this.computeService = context.getComputeService();
-
+       
     }
 
     public CloudComputeService(ProviderType provider, ComputeService computeService) {
@@ -195,29 +209,48 @@ public class CloudComputeService {
             .userData(userDataString.getBytes(Charset.forName("UTF-8")));
         }
 
-        Template template = computeService.templateBuilder()
-                .imageId(job.getComputeVmId())
-                .hardwareId(job.getComputeInstanceType())
-                .options(options)
-                .build();
+        ServerApi serverApi = api.getServerApiForZone("Melbourne");        
+        CreateServerOptions options2 = new CreateServerOptions();
+        options2
+            .availabilityZone("NCI")
+            .keyPairName("vgl-developers")
+            .userData(userDataString.getBytes(Charset.forName("UTF-8")));
 
-        //Start up the job, we should have exactly 1 node start
-        Set<? extends NodeMetadata> results;
-        try {
-            results = computeService.createNodesInGroup(groupName, 1, template);
-        } catch (RunNodesException e) {
-            logger.error(String.format("An unexpected error '%1$s' occured while executing job '%2$s'", e.getMessage(), job));
-            logger.debug("Exception:", e);
-            throw new PortalServiceException("An unexpected error has occured while executing your job. Most likely this is from the lack of available resources. Please try using"
-                    + "a smaller virtual machine", "Please report it to cg-admin@csiro.au : " + e.getMessage(),e);
-        }
-        if (results.isEmpty()) {
-            logger.error("JClouds returned an empty result set. Treating it as job failure.");
-            throw new PortalServiceException("Unable to start compute node due to an unknown error, no nodes returned");
-        }
-        NodeMetadata result = results.iterator().next();
-
-        return result.getId();
+        // Generate a hostname based on group name
+        String hostName = groupName + (new Date()).getTime();
+        
+        ServerCreated serverCreated = serverApi.create(hostName,
+                                                job.getComputeVmId(),
+                                                job.getComputeInstanceType(),
+                                                options2);
+        
+        return serverCreated.getId();
+        
+        
+//        Template template = computeService.templateBuilder()
+//                .imageId(job.getComputeVmId())
+//                .hardwareId(job.getComputeInstanceType())
+//                .options(options)                
+//                .build();
+//
+//        //Start up the job, we should have exactly 1 node start
+//        Set<? extends NodeMetadata> results;
+//        try {
+//            
+//            results = computeService.createNodesInGroup(groupName, 1, template);
+//        } catch (RunNodesException e) {
+//            logger.error(String.format("An unexpected error '%1$s' occured while executing job '%2$s'", e.getMessage(), job));
+//            logger.debug("Exception:", e);
+//            throw new PortalServiceException("An unexpected error has occured while executing your job. Most likely this is from the lack of available resources. Please try using"
+//                    + "a smaller virtual machine", "Please report it to cg-admin@csiro.au : " + e.getMessage(),e);
+//        }
+//        if (results.isEmpty()) {
+//            logger.error("JClouds returned an empty result set. Treating it as job failure.");
+//            throw new PortalServiceException("Unable to start compute node due to an unknown error, no nodes returned");
+//        }
+//        NodeMetadata result = results.iterator().next();
+//
+//        return result.getId();
     }
 
     /**
