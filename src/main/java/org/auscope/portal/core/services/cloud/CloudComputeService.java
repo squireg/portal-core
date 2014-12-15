@@ -1,10 +1,14 @@
 package org.auscope.portal.core.services.cloud;
 
 import static com.google.common.base.Predicates.not;
+
 import static org.jclouds.compute.predicates.NodePredicates.RUNNING;
 import static org.jclouds.compute.predicates.NodePredicates.TERMINATED;
 import static org.jclouds.compute.predicates.NodePredicates.inGroup;
+import static org.jclouds.compute.options.TemplateOptions.Builder.overrideLoginCredentials;
 
+import java.io.File;
+import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -23,22 +27,30 @@ import org.jclouds.ContextBuilder;
 import org.jclouds.compute.ComputeService;
 import org.jclouds.compute.ComputeServiceContext;
 import org.jclouds.compute.RunNodesException;
+import org.jclouds.compute.domain.ExecResponse;
 import org.jclouds.compute.domain.Hardware;
 import org.jclouds.compute.domain.NodeMetadata;
 import org.jclouds.compute.domain.Processor;
 import org.jclouds.compute.domain.Template;
 import org.jclouds.compute.domain.Volume;
+import org.jclouds.compute.options.RunScriptOptions;
 import org.jclouds.compute.options.TemplateOptions;
+import org.jclouds.domain.LoginCredentials;
 import org.jclouds.ec2.compute.options.EC2TemplateOptions;
 import org.jclouds.ec2.reference.EC2Constants;
 import org.jclouds.openstack.nova.v2_0.NovaApi;
 import org.jclouds.openstack.nova.v2_0.compute.options.NovaTemplateOptions;
 import org.jclouds.openstack.nova.v2_0.domain.zonescoped.AvailabilityZone;
 import org.jclouds.openstack.nova.v2_0.extensions.AvailabilityZoneApi;
+import org.jclouds.sshj.config.SshjSshClientModule;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.io.Files;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.inject.Module;
 
 /**
  * Service class wrapper for interacting with a remote cloud compute service using
@@ -120,10 +132,13 @@ public class CloudComputeService {
         }
         this.provider = provider;
 
+        Iterable<Module> modules = ImmutableSet.<Module> of(new SshjSshClientModule());
+
         ContextBuilder b = ContextBuilder.newBuilder(typeString)
-                .endpoint(endpoint)
-                .overrides(overrides)
-                .credentials(accessKey, secretKey);
+            .endpoint(endpoint)
+            .overrides(overrides)
+            .modules(modules)
+            .credentials(accessKey, secretKey);
 
         if (apiVersion != null) {
             b.apiVersion(apiVersion);
@@ -269,8 +284,7 @@ public class CloudComputeService {
                     logger.info(String.format("Trying '%1$s'", currentZone.getName()));
                     options = ((NovaTemplateOptions)computeService.templateOptions())
                     .keyPairName(getKeypair())
-                    .availabilityZone(currentZone.getName())
-                    .userData(userDataString.getBytes(Charset.forName("UTF-8")));
+                    .availabilityZone(currentZone.getName());
 
                     Template template = computeService.templateBuilder()
                             .imageId(job.getComputeVmId())
@@ -300,6 +314,7 @@ public class CloudComputeService {
                     }
                 }
             }
+
             if (results.isEmpty()) {
                 //Now we have tried everything....
                 logger.error("run out of places to try...");
@@ -313,6 +328,28 @@ public class CloudComputeService {
         }
         logger.info(String.format("We have a successful launch @ '%1$s'", this.itActuallyLaunchedHere));
 
+        // Execute the script
+        String privateKey = null;
+        try {
+            privateKey = Files.toString(new File(System.getProperty("user.home") + "/.keys/vgl-developers.pem"), Charset.forName("UTF-8"));
+            LoginCredentials creds = LoginCredentials.builder()
+                .user("ec2-user")
+                .privateKey(privateKey)
+                .build();
+
+            RunScriptOptions rsOptions =
+                overrideLoginCredentials(creds)
+                .runAsRoot(true);
+
+            ListenableFuture<ExecResponse> response =
+                computeService.submitScriptOnNode(result.getId(),
+                                                  userDataString,
+                                                  rsOptions);
+            logger.info("Submitted user script. Completed? " + response.isDone());
+        }
+        catch (IOException e) {
+            logger.error(e.getMessage());
+        }
 
         return result.getId();
     }
