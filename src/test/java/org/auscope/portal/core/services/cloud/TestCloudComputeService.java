@@ -1,5 +1,7 @@
 package org.auscope.portal.core.services.cloud;
 
+import java.util.Arrays;
+
 import junit.framework.Assert;
 
 import org.auscope.portal.core.cloud.CloudJob;
@@ -8,11 +10,10 @@ import org.auscope.portal.core.services.cloud.CloudComputeService.ProviderType;
 import org.auscope.portal.core.test.PortalTestClass;
 import org.jclouds.compute.ComputeService;
 import org.jclouds.compute.RunNodesException;
-import org.jclouds.compute.domain.ExecResponse;
 import org.jclouds.compute.domain.NodeMetadata;
 import org.jclouds.compute.domain.Template;
 import org.jclouds.compute.domain.TemplateBuilder;
-import org.jclouds.compute.options.RunScriptOptions;
+import org.jclouds.domain.LoginCredentials;
 import org.jclouds.openstack.nova.v2_0.NovaApi;
 import org.jclouds.openstack.nova.v2_0.compute.options.NovaTemplateOptions;
 import org.jclouds.openstack.nova.v2_0.domain.zonescoped.AvailabilityZone;
@@ -27,7 +28,6 @@ import com.google.common.base.Predicate;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
-import com.google.common.util.concurrent.ListenableFuture;
 
 public class TestCloudComputeService extends PortalTestClass {
 
@@ -44,8 +44,8 @@ public class TestCloudComputeService extends PortalTestClass {
     private final FluentIterable mockAvailZoneList = context.mock(FluentIterable.class);
     private final Predicate<NodeMetadata> mockFilter = context.mock(Predicate.class);
     private final RunNodesException mockException = context.mock(RunNodesException.class);
-    private final ListenableFuture<ExecResponse> mockSubmitResponse =
-        (ListenableFuture<ExecResponse>)context.mock(ListenableFuture.class);
+    // private final ListenableFuture<ExecResponse> mockSubmitResponse =
+    //     (ListenableFuture<ExecResponse>)context.mock(ListenableFuture.class);
 
     private CloudComputeService service;
 
@@ -63,7 +63,8 @@ public class TestCloudComputeService extends PortalTestClass {
         service = new CloudComputeService(ProviderType.NovaKeystone, mockComputeService, mockNovaApi, mockFilter);
         service.setGroupName("group-name");
         service.setKeypair("vgl-developers");
-
+        service.setSshUser("ec2-user");
+        service.setSshKey("pom.xml");
     }
 
     /**
@@ -91,6 +92,10 @@ public class TestCloudComputeService extends PortalTestClass {
 
             oneOf(mockTemplateOptions).keyPairName("vgl-developers");will(returnValue(mockTemplateOptions));
             oneOf(mockTemplateOptions).availabilityZone("my-zone");will(returnValue(mockTemplateOptions));
+            oneOf(mockTemplateOptions).blockOnComplete(false);will(returnValue(mockTemplateOptions));
+            oneOf(mockTemplateOptions).runScript(userDataString);will(returnValue(mockTemplateOptions));
+            oneOf(mockTemplateOptions).overrideLoginCredentials(with(any(LoginCredentials.class)));will(returnValue(mockTemplateOptions));
+            oneOf(mockTemplateOptions).runAsRoot(true);will(returnValue(mockTemplateOptions));            
 
             oneOf(mockTemplateBuilder).imageId(job.getComputeVmId());will(returnValue(mockTemplateBuilder));
             oneOf(mockTemplateBuilder).hardwareId(job.getComputeInstanceType());will(returnValue(mockTemplateBuilder));
@@ -102,11 +107,11 @@ public class TestCloudComputeService extends PortalTestClass {
 
             allowing(mockMetadata).getId();will(returnValue(expectedInstanceId));
 
-            oneOf(mockComputeService).submitScriptOnNode(with(expectedInstanceId),
-                                                         with(userDataString),
-                                                         with(any(RunScriptOptions.class)));
-            will(returnValue(mockSubmitResponse));
-            allowing(mockSubmitResponse).isDone();
+            // oneOf(mockComputeService).submitScriptOnNode(with(expectedInstanceId),
+            //                                              with(userDataString),
+            //                                              with(any(RunScriptOptions.class)));
+            // will(returnValue(mockSubmitResponse));
+            // allowing(mockSubmitResponse).isDone();
         }});
 
         String actualInstanceId = service.executeJob(job, userDataString);
@@ -139,6 +144,11 @@ public class TestCloudComputeService extends PortalTestClass {
 
             oneOf(mockTemplateOptions).keyPairName("vgl-developers");will(returnValue(mockTemplateOptions));
             oneOf(mockTemplateOptions).availabilityZone("my-zone");will(returnValue(mockTemplateOptions));
+            oneOf(mockTemplateOptions).blockOnComplete(false);will(returnValue(mockTemplateOptions));
+            oneOf(mockTemplateOptions).runScript(userDataString);will(returnValue(mockTemplateOptions));
+            oneOf(mockTemplateOptions).overrideLoginCredentials(with(any(LoginCredentials.class)));will(returnValue(mockTemplateOptions));
+            oneOf(mockTemplateOptions).runAsRoot(true);will(returnValue(mockTemplateOptions));            
+            
 
 
             oneOf(mockTemplateBuilder).imageId(job.getComputeVmId());will(returnValue(mockTemplateBuilder));
@@ -184,6 +194,11 @@ public class TestCloudComputeService extends PortalTestClass {
 
             oneOf(mockTemplateOptions).keyPairName("vgl-developers");will(returnValue(mockTemplateOptions));
             oneOf(mockTemplateOptions).availabilityZone("my-zone");will(returnValue(mockTemplateOptions));
+            oneOf(mockTemplateOptions).blockOnComplete(false);will(returnValue(mockTemplateOptions));
+            oneOf(mockTemplateOptions).runScript(userDataString);will(returnValue(mockTemplateOptions));
+            oneOf(mockTemplateOptions).overrideLoginCredentials(with(any(LoginCredentials.class)));will(returnValue(mockTemplateOptions));
+            oneOf(mockTemplateOptions).runAsRoot(true);will(returnValue(mockTemplateOptions));            
+            
 
             oneOf(mockTemplateBuilder).imageId(job.getComputeVmId());will(returnValue(mockTemplateBuilder));
             oneOf(mockTemplateBuilder).hardwareId(job.getComputeInstanceType());will(returnValue(mockTemplateBuilder));
@@ -240,9 +255,12 @@ public class TestCloudComputeService extends PortalTestClass {
 
             oneOf(mockComputeService).templateOptions();will(returnValue(mockTemplateOptions));
             oneOf(mockComputeService).templateBuilder();will(returnValue(mockTemplateBuilder));
+            oneOf(mockTemplateOptions).blockOnComplete(false);will(returnValue(mockTemplateOptions));
+            oneOf(mockTemplateOptions).runScript(userDataString);will(returnValue(mockTemplateOptions));
+            oneOf(mockTemplateOptions).overrideLoginCredentials(with(any(LoginCredentials.class)));will(returnValue(mockTemplateOptions));
+            oneOf(mockTemplateOptions).runAsRoot(true);will(returnValue(mockTemplateOptions));            
 
             oneOf(mockTemplateOptions).keyPairName("vgl-developers");will(returnValue(mockTemplateOptions));
-            oneOf(mockTemplateOptions).userData(userDataString.getBytes(Charset.forName("UTF-8")));will(returnValue(mockTemplateOptions));
             oneOf(mockTemplateOptions).availabilityZone("my-notskip-zone");will(returnValue(mockTemplateOptions));
 
             oneOf(mockTemplateBuilder).imageId(job.getComputeVmId());will(returnValue(mockTemplateBuilder));
@@ -288,8 +306,11 @@ public class TestCloudComputeService extends PortalTestClass {
             oneOf(mockComputeService).templateBuilder();will(returnValue(mockTemplateBuilder));
 
             oneOf(mockTemplateOptions).keyPairName("vgl-developers");will(returnValue(mockTemplateOptions));
-            oneOf(mockTemplateOptions).userData(userDataString.getBytes(Charset.forName("UTF-8")));will(returnValue(mockTemplateOptions));
             oneOf(mockTemplateOptions).availabilityZone("my-zone");will(returnValue(mockTemplateOptions));
+            oneOf(mockTemplateOptions).blockOnComplete(false);will(returnValue(mockTemplateOptions));
+            oneOf(mockTemplateOptions).runScript(userDataString);will(returnValue(mockTemplateOptions));
+            oneOf(mockTemplateOptions).overrideLoginCredentials(with(any(LoginCredentials.class)));will(returnValue(mockTemplateOptions));
+            oneOf(mockTemplateOptions).runAsRoot(true);will(returnValue(mockTemplateOptions));            
 
             oneOf(mockTemplateBuilder).imageId(job.getComputeVmId());will(returnValue(mockTemplateBuilder));
             oneOf(mockTemplateBuilder).hardwareId(job.getComputeInstanceType());will(returnValue(mockTemplateBuilder));
@@ -309,8 +330,11 @@ public class TestCloudComputeService extends PortalTestClass {
             oneOf(mockComputeService).templateBuilder();will(returnValue(mockTemplateBuilder));
 
             oneOf(mockTemplateOptions).keyPairName("vgl-developers");will(returnValue(mockTemplateOptions));
-            oneOf(mockTemplateOptions).userData(userDataString.getBytes(Charset.forName("UTF-8")));will(returnValue(mockTemplateOptions));
             oneOf(mockTemplateOptions).availabilityZone("my-zone-2");will(returnValue(mockTemplateOptions));
+            oneOf(mockTemplateOptions).blockOnComplete(false);will(returnValue(mockTemplateOptions));
+            oneOf(mockTemplateOptions).runScript(userDataString);will(returnValue(mockTemplateOptions));
+            oneOf(mockTemplateOptions).overrideLoginCredentials(with(any(LoginCredentials.class)));will(returnValue(mockTemplateOptions));
+            oneOf(mockTemplateOptions).runAsRoot(true);will(returnValue(mockTemplateOptions));            
 
             oneOf(mockTemplateBuilder).imageId(job.getComputeVmId());will(returnValue(mockTemplateBuilder));
             oneOf(mockTemplateBuilder).hardwareId(job.getComputeInstanceType());will(returnValue(mockTemplateBuilder));

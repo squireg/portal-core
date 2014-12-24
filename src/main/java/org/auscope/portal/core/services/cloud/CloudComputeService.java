@@ -97,6 +97,10 @@ public class CloudComputeService {
      * this provider. */
     private String keypair;
 
+    // Name of the user and private key file for SSH access
+    private String sshUser;
+    private String sshKey;
+
     /**
      * Creates a new instance with the specified credentials
      * @param endpoint (URL) The location of the Compute (Nova) service
@@ -265,6 +269,9 @@ public class CloudComputeService {
 
         }
         else {
+            // Prepare the login credentials
+            LoginCredentials creds = getLoginCredentials();
+
             //Brute force anyone?
             for (String location: lowLevelApi.getConfiguredZones()) {
                 Optional<? extends AvailabilityZoneApi> serverApi = lowLevelApi.getAvailabilityZoneApi(location);
@@ -283,8 +290,12 @@ public class CloudComputeService {
 
                     logger.info(String.format("Trying '%1$s'", currentZone.getName()));
                     options = ((NovaTemplateOptions)computeService.templateOptions())
-                    .keyPairName(getKeypair())
-                    .availabilityZone(currentZone.getName());
+                        .keyPairName(getKeypair())
+                        .availabilityZone(currentZone.getName())
+                        .blockOnComplete(false)
+                        .runScript(userDataString)
+                        .overrideLoginCredentials(creds)
+                        .runAsRoot(true);
 
                     Template template = computeService.templateBuilder()
                             .imageId(job.getComputeVmId())
@@ -327,29 +338,6 @@ public class CloudComputeService {
 
         }
         logger.info(String.format("We have a successful launch @ '%1$s'", this.itActuallyLaunchedHere));
-
-        // Execute the script
-        String privateKey = null;
-        try {
-            privateKey = Files.toString(new File(System.getProperty("user.home") + "/.keys/vgl-developers.pem"), Charset.forName("UTF-8"));
-            LoginCredentials creds = LoginCredentials.builder()
-                .user("ec2-user")
-                .privateKey(privateKey)
-                .build();
-
-            RunScriptOptions rsOptions =
-                overrideLoginCredentials(creds)
-                .runAsRoot(true);
-
-            ListenableFuture<ExecResponse> response =
-                computeService.submitScriptOnNode(result.getId(),
-                                                  userDataString,
-                                                  rsOptions);
-            logger.info("Submitted user script. Completed? " + response.isDone());
-        }
-        catch (IOException e) {
-            logger.error(e.getMessage());
-        }
 
         return result.getId();
     }
@@ -407,6 +395,70 @@ public class CloudComputeService {
 
     public void setKeypair(String keypair) {
         this.keypair = keypair;
+    }
+
+    /**
+     * Return the LoginCredentials corresponding to the configured keypair.
+     *
+     * @throws PortalServiceException if the credentials couldn't be loaded
+     */
+    protected LoginCredentials getLoginCredentials()
+        throws PortalServiceException {
+        LoginCredentials creds = null;
+        File keyfile = new File(getSshKey());
+
+        try {
+            String privateKey = Files.toString(keyfile,
+                                               Charset.forName("UTF-8"));
+            creds = LoginCredentials.builder()
+                .user(getSshUser())
+                .privateKey(privateKey)
+                .build();
+        }
+        catch (IOException e) {
+            throw new PortalServiceException("Load private key failed (" +
+                                             keyfile.getAbsolutePath() +
+                                             "): " + e.getMessage(),
+                                             e);
+        }
+
+        return creds;
+    }
+
+    /**
+     * Return the filename containing the configured keypair.
+     *
+     * @return String name of file that contains the configured keypair
+     */
+    public String getSshKey() {
+        return sshKey;
+    }
+
+    /**
+     * Set the filename for the configured keypair.
+     *
+     * @param sshKey String filename containing configured keypair
+     */
+    public void setSshKey(String sshKey) {
+        this.sshKey = sshKey;
+    }
+
+    /**
+     * Return the username for ssh access.
+     *
+     * @return String username for ssh script access
+     */
+    public String getSshUser() {
+        return sshUser;
+    }
+
+    /**
+     * Set the username for ssh access for running scripts.
+     *
+     * @param sshUser String username for ssh access
+     */
+    public void setSshUser(String sshUser) {
+        this.sshUser = sshUser;
     }
 
     /**
