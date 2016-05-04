@@ -89,7 +89,10 @@ Ext.define('portal.map.openlayers.PrimitiveManager', {
                 position = this.baseMap.map.layers.length - 1 - position;
                 this.baseMap.map.setLayerIndex(layer,position);
             }
+                        
         }
+        
+        this.baseMap.map.setLayerIndex(this.baseMap._drawCtrlVectorLayer, 9999);
 
         if (vectors.length > 0) {
             this.vectorLayer.addFeatures(vectors);
