@@ -7,6 +7,8 @@ import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathExpression;
 import javax.xml.xpath.XPathExpressionException;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.auscope.portal.core.services.namespaces.CSWNamespaceContext;
 import org.auscope.portal.core.util.DOMUtil;
 import org.w3c.dom.Node;
@@ -15,17 +17,21 @@ import org.w3c.dom.Node;
  * A factory for creating CSWOnlineResource objects.
  */
 public abstract class CSWOnlineResourceFactory {
-
+    
+	protected static final Log logger = LogFactory.getLog(CSWOnlineResourceFactory.class);
+        
     /**
      * Parses a Node into its appropriate CSWOnlineResource representation.
      *
      * @param node
      *            Must be a <gmd:CI_OnlineResource> node
+     * @param threddsLayerName 
+     * 			  the name of dataset layer indexed by Thredds server.
      * @return the abstract csw online resource
      * @throws XPathExpressionException
      *             the x path expression exception
      */
-    public static AbstractCSWOnlineResource parseFromNode(Node node) throws XPathExpressionException {
+    public static AbstractCSWOnlineResource parseFromNode(Node node, String threddsLayerName) throws XPathExpressionException {
         String urlString = null;
         String name = "";
         String description = "";
@@ -57,10 +63,14 @@ public abstract class CSWOnlineResourceFactory {
         }
 
         protocol = (String) protocolXpath.evaluate(node, XPathConstants.STRING);
-        name = (String) nameXpath.evaluate(node, XPathConstants.STRING);
+        if (threddsLayerName != null && threddsLayerName.length() > 0) {
+        	name = threddsLayerName;
+        }
+        else {
+            name = (String) nameXpath.evaluate(node, XPathConstants.STRING);
+        }
         description = (String) descriptionXpath.evaluate(node, XPathConstants.STRING);
         applicationProfile = (String) applicationProfileXpath.evaluate(node, XPathConstants.STRING);
-
         return new CSWOnlineResourceImpl(url, protocol, name, description, applicationProfile);
     }
 }
